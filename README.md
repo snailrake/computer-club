@@ -35,11 +35,13 @@ php artisan serve
 
 `composer setup` устанавливает зависимости из `composer.lock`, создаёт `.env`, ключ приложения, SQLite-базу и демонстрационные данные. Для последующих запусков достаточно `php artisan serve`.
 
+Начальная схема собрана в одной миграции. Для полного сброса учебной базы выполните `php artisan migrate:fresh --seed`: команда удаляет все данные и заново создаёт таблицы и демонстрационные записи.
+
 В PhpStorm открыть корневую папку проекта и выбрать PHP 8.5 в **Settings → PHP → CLI Interpreter**.
 
 ## Демонстрационные аккаунты
 
-Пароль для всех: **`ClubDemo2026!`**
+Пароль для всех: **`123`**
 
 | Роль | Email |
 |---|---|
@@ -54,6 +56,7 @@ php artisan serve
 | Часть | Расположение |
 |---|---|
 | Маршруты | [routes/web.php](routes/web.php) |
+| Схема БД | [одна миграция](database/migrations/2026_10_19_000000_create_application_tables.php) |
 | CRUD и проверка пересечений | [контроллеры](app/Http/Controllers) |
 | Данные и связи Eloquent | [модели](app/Models) |
 | Проверка форм | [Form Requests](app/Http/Requests) |

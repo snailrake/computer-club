@@ -86,27 +86,4 @@ class BookingTimeTest extends TestCase
         $this->assertModelMissing($booking);
     }
 
-    public function test_old_dates_are_migrated_without_changing_the_local_visit_or_account_data(): void
-    {
-        $this->client->forceFill([
-            'created_at' => '2026-10-17 15:23:58', 'updated_at' => '2026-10-17 15:23:58',
-            'email_verified_at' => '2026-10-17 16:00:00',
-        ])->save();
-        $booking = new Booking(['computer_id' => $this->computer->id, 'starts_at' => '2026-10-20 18:00:00', 'ends_at' => '2026-10-20 19:00:00']);
-        $this->client->bookings()->save($booking);
-        $passwordHash = $this->client->password;
-        $migration = require database_path('migrations/2026_10_17_000006_convert_local_timestamps_to_utc.php');
-        $migration->up();
-        $booking->refresh();
-        $this->assertSame('2026-10-20 14:00:00', $booking->getRawOriginal('starts_at'));
-        $this->assertSame('2026-10-20 15:00:00', $booking->getRawOriginal('ends_at'));
-        $this->assertSame('2026-10-20 18:00:00', $booking->startsAtInClubTime()->format('Y-m-d H:i:s'));
-        $this->assertSame('2026-10-17 11:23:58', $this->client->fresh()->getRawOriginal('created_at'));
-        $this->assertSame('2026-10-17 12:00:00', $this->client->fresh()->getRawOriginal('email_verified_at'));
-        $this->assertSame($passwordHash, $this->client->fresh()->password);
-        $this->assertSame($this->client->id, $booking->user_id);
-        $migration->down();
-        $this->assertSame('2026-10-20 18:00:00', $booking->fresh()->getRawOriginal('starts_at'));
-        $this->assertDatabaseCount('bookings', 1);
-    }
 }

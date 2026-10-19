@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
-class SessionController extends Controller
+class SessionController
 {
     public function create(): View
     {

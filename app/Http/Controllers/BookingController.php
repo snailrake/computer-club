@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
-class BookingController extends Controller
+class BookingController
 {
     public function index(Request $request): View
     {

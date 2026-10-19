@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
-class ComputerController extends Controller
+class ComputerController
 {
     public function index(): View
     {

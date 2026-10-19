@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             $user = User::query()->firstOrNew(['email' => $account['email']]);
 
             if (! $user->exists) {
-                $user->forceFill([...$account, 'password' => 'ClubDemo2026!'])->save();
+                $user->forceFill([...$account, 'password' => '123'])->save();
             }
         }
 
