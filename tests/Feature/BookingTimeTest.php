@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Enums\UserRole;
 use App\Models\Booking;
 use App\Models\Computer;
 use App\Models\User;
@@ -58,40 +57,33 @@ class BookingTimeTest extends TestCase
         $this->get('/bookings/create')->assertSee('min="2026-10-18T13:31"', escape: false);
     }
 
-    public function test_started_bookings_are_read_only_for_clients_and_only_admin_can_delete_history(): void
+    public function test_owner_can_change_a_past_booking_to_a_future_period(): void
     {
         $booking = new Booking([
             'computer_id' => $this->computer->id,
-            'starts_at' => now()->subHour(), 'ends_at' => now()->addHour(),
+            'starts_at' => now()->subHours(2), 'ends_at' => now()->subHour(),
         ]);
         $this->client->bookings()->save($booking);
-        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('Время вашего визита')
-            ->assertDontSee('Изменить бронирование')->assertDontSee('Отменить бронирование');
-        $this->get(route('bookings.edit', $booking))->assertForbidden();
+
+        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('Изменить бронирование');
+        $this->get(route('bookings.edit', $booking))->assertOk();
         $this->patch(route('bookings.update', $booking), [
             'computer_id' => $this->computer->id, 'starts_at' => '2026-10-19T15:00', 'ends_at' => '2026-10-19T16:00',
-        ])->assertForbidden();
-        $this->delete(route('bookings.destroy', $booking))->assertForbidden();
-        $this->assertModelExists($booking);
-
-        $booking->update(['ends_at' => now()->subMinute()]);
-        $this->get(route('bookings.show', $booking))->assertOk()->assertSee('Визит завершён');
-        $this->actingAs(User::factory()->create(['role' => UserRole::Admin]));
-        $this->get(route('bookings.edit', $booking))->assertForbidden();
-        $this->delete(route('bookings.destroy', $booking))->assertRedirect('/bookings');
-        $this->assertModelMissing($booking);
+        ])->assertRedirect();
+        $this->assertSame('2026-10-19 11:00:00', $booking->fresh()->getRawOriginal('starts_at'));
+        $this->assertSame($this->client->id, $booking->fresh()->user_id);
     }
 
-    public function test_public_busy_periods_show_local_time_without_clients_personal_data(): void
+    public function test_owner_can_delete_a_past_booking(): void
     {
         $booking = new Booking([
             'computer_id' => $this->computer->id,
-            'starts_at' => now()->addHour(), 'ends_at' => now()->addHours(2),
+            'starts_at' => now()->subHours(2), 'ends_at' => now()->subHour(),
         ]);
         $this->client->bookings()->save($booking);
-        auth()->logout();
-        $this->get(route('computers.show', $this->computer))->assertOk()->assertSee('18.10.2026 14:30')
-            ->assertDontSee($this->client->name)->assertDontSee($this->client->email);
+
+        $this->delete(route('bookings.destroy', $booking))->assertRedirect('/bookings');
+        $this->assertModelMissing($booking);
     }
 
     public function test_old_dates_are_migrated_without_changing_the_local_visit_or_account_data(): void

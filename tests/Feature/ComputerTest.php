@@ -74,16 +74,16 @@ class ComputerTest extends TestCase
         $this->actingAs(User::factory()->create())->get('/computers/99999')->assertNotFound()->assertSee('Страница не найдена');
     }
 
-    public function test_catalog_pagination_and_inactive_computer_card_work(): void
+    public function test_catalog_paginates_and_inactive_computers_cannot_be_booked(): void
     {
-        for ($number = 1; $number <= 10; $number++) {
-            Computer::query()->create(['name' => sprintf('PC-%02d', $number), 'is_active' => $number !== 10]);
+        for ($number = 1; $number <= 11; $number++) {
+            Computer::query()->create(['name' => sprintf('PC-%02d', $number), 'is_active' => $number !== 11]);
         }
 
         $this->actingAs(User::factory()->create());
-        $this->get('/computers')->assertOk()->assertSee('Страница 1 из 2')->assertDontSee('PC-10');
-        $this->get('/computers?page=2')->assertOk()->assertSee('PC-10');
-        $computer = Computer::query()->where('name', 'PC-10')->firstOrFail();
+        $this->get('/computers')->assertOk()->assertSee('Страница 1 из 2')->assertDontSee('PC-11');
+        $this->get('/computers?page=2')->assertOk()->assertSee('PC-11');
+        $computer = Computer::query()->where('name', 'PC-11')->firstOrFail();
         $this->get(route('computers.show', $computer))->assertOk()->assertDontSee('Забронировать компьютер');
     }
 }

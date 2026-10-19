@@ -15,9 +15,11 @@ class AuthenticationTest extends TestCase
 
     public function test_guests_can_browse_but_must_log_in_to_book(): void
     {
-        $this->get('/computers')->assertOk()->assertSee('САРАТОВ');
+        $this->get('/computers')->assertOk()->assertSee('Компьютерный клуб');
         $this->get('/bookings')->assertRedirect('/login');
-        $this->get('/login')->assertOk()->assertSee('С возвращением');
+        $this->get('/login')->assertOk()->assertSee('Email')->assertSee('Пароль');
+        $this->get('/register')->assertNotFound();
+        $this->post('/register', [])->assertNotFound();
     }
 
     public function test_both_roles_can_log_in_and_log_out(): void
@@ -41,48 +43,46 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_login_is_rate_limited(): void
+    public function test_login_uses_standard_rate_limiting(): void
     {
         for ($attempt = 0; $attempt < 6; $attempt++) {
             $this->postJson('/login', ['email' => 'missing@club.test', 'password' => 'incorrect'])
                 ->assertUnprocessable();
         }
 
-        $response = $this->postJson('/login', ['email' => 'missing@club.test', 'password' => 'incorrect'])
-            ->assertUnprocessable()->assertJsonValidationErrors('email');
-        $this->assertStringContainsString('Слишком много попыток', $response->json('errors.email.0'));
+        $this->postJson('/login', ['email' => 'missing@club.test', 'password' => 'incorrect'])
+            ->assertTooManyRequests()->assertHeader('Retry-After');
         $this->assertGuest();
+
         $this->travel(61)->seconds();
         $this->postJson('/login', ['email' => 'missing@club.test', 'password' => 'incorrect'])
             ->assertUnprocessable()->assertJsonPath('errors.email.0', 'Неверный email или пароль.');
     }
 
-    public function test_successful_login_clears_failures_and_returns_to_the_selected_computer(): void
+    public function test_login_regenerates_the_session_and_returns_to_the_selected_computer(): void
     {
         $user = User::factory()->create();
         $destination = route('bookings.create', ['computer' => 7]);
         $this->get($destination)->assertRedirect('/login');
-
-        for ($attempt = 0; $attempt < 5; $attempt++) {
-            $this->postJson('/login', ['email' => strtoupper($user->email), 'password' => 'incorrect'])
-                ->assertUnprocessable();
-        }
-
         $sessionId = session()->getId();
-        $this->post('/login', ['email' => strtoupper($user->email), 'password' => 'password'])->assertRedirect($destination);
+
+        $this->post('/login', ['email' => ' '.strtoupper($user->email).' ', 'password' => 'password'])->assertRedirect($destination);
         $this->assertAuthenticatedAs($user);
         $this->assertNotSame($sessionId, session()->getId());
-        $this->post('/logout')->assertRedirect('/computers');
 
+        $this->post('/logout')->assertRedirect('/computers');
         $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/computers');
         $this->assertAuthenticatedAs($user);
     }
 
-    public function test_login_does_not_accept_a_truncated_bcrypt_password(): void
+    public function test_login_rejects_overlong_and_null_byte_passwords(): void
     {
         $user = User::factory()->create(['password' => str_repeat('a', 72)]);
-        $this->postJson('/login', ['email' => $user->email, 'password' => str_repeat('a', 72).'wrong-suffix'])
-            ->assertUnprocessable()->assertJsonValidationErrors('email');
-        $this->assertGuest();
+
+        foreach ([str_repeat('a', 72).'wrong-suffix', "password\0suffix"] as $password) {
+            $this->postJson('/login', ['email' => $user->email, 'password' => $password])
+                ->assertUnprocessable()->assertJsonValidationErrors('email');
+            $this->assertGuest();
+        }
     }
 }

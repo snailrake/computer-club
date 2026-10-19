@@ -7,6 +7,7 @@ namespace App\Http\Requests;
 use App\Models\Booking;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class BookingRequest extends FormRequest
 {
@@ -20,7 +21,7 @@ class BookingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'computer_id' => ['required', 'integer'],
+            'computer_id' => ['bail', 'required', 'integer', Rule::exists('computers', 'id')->where('is_active', true)],
             'starts_at' => ['bail', 'required', 'date_format:'.Booking::INPUT_DATE_FORMAT],
             'ends_at' => ['required', 'date_format:'.Booking::INPUT_DATE_FORMAT, 'after:starts_at'],
             'user_id' => ['prohibited'],

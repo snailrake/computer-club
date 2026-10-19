@@ -16,11 +16,11 @@ class BookingPolicy
 
     public function update(User $user, Booking $booking): bool
     {
-        return $this->view($user, $booking) && $booking->starts_at->isFuture();
+        return $this->view($user, $booking);
     }
 
     public function delete(User $user, Booking $booking): bool
     {
-        return $this->view($user, $booking) && ($user->isAdmin() || $booking->starts_at->isFuture());
+        return $this->view($user, $booking);
     }
 }

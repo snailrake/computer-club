@@ -1,29 +1,19 @@
 <x-layout title="Изменить бронь">
-    <a class="back-link" href="{{ route('bookings.show', $booking) }}">← Бронь #{{ $booking->id }}</a>
-    <section class="page-heading">
-        <div>
-            <p class="eyebrow">ИЗМЕНЕНИЕ ПЛАНОВ</p>
-            <h1>Перенести бронирование</h1>
-            <p class="muted">Выберите новый компьютер или период по Саратову. При ошибке исходная бронь сохранится.</p>
-            @if (auth()->user()->isAdmin() && $booking->user_id !== auth()->id())
-                <p class="form-note">Бронь клиента: {{ $booking->user->name }}. Владелец останется прежним.</p>
-            @endif
-        </div>
-    </section>
+    <h1>Изменить бронирование #{{ $booking->id }}</h1>
     @if ($computers->isEmpty())
-        <section class="panel empty-state">
+        <div class="panel">
             <h2>Нет компьютеров для переноса</h2>
-            <p>Сейчас ни одно место не принимает брони. Существующая бронь сохранена.</p>
-            <a class="button button-dark" href="{{ route('bookings.show', $booking) }}">К бронированию</a>
-        </section>
+            <p>Существующая бронь сохранена.</p>
+            <a href="{{ route('bookings.show', $booking) }}">К бронированию</a>
+        </div>
     @else
-        <form class="panel form-panel form-stack" action="{{ route('bookings.update', $booking) }}" method="POST">
+        <form class="panel form-panel" action="{{ route('bookings.update', $booking) }}" method="POST">
             @csrf
             @method('PATCH')
             @include('bookings._form')
-            <div class="form-actions">
-                <button class="button button-primary" type="submit">Сохранить изменения</button>
-                <a class="button button-quiet" href="{{ route('bookings.show', $booking) }}">Отмена</a>
+            <div class="actions">
+                <button type="submit">Сохранить изменения</button>
+                <a class="button secondary" href="{{ route('bookings.show', $booking) }}">Отмена</a>
             </div>
         </form>
     @endif

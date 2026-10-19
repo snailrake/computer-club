@@ -7,11 +7,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BookingRequest;
 use App\Models\Booking;
 use App\Models\Computer;
-use App\Services\BookingService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class BookingController extends Controller
@@ -36,26 +36,20 @@ class BookingController extends Controller
         ]);
     }
 
-    public function store(BookingRequest $request, BookingService $service): RedirectResponse
+    public function store(BookingRequest $request): RedirectResponse
     {
         $booking = new Booking();
         $booking->user()->associate($request->user());
-        $service->save(
-            $booking,
-            $request->integer('computer_id'),
-            $request->validated('starts_at'),
-            $request->validated('ends_at'),
-        );
+        $this->saveBooking($request, $booking);
 
-        return redirect()->route('bookings.show', $booking)->with('success', 'Бронирование оформлено. Компьютер закреплён за вами на выбранное время.');
+        return redirect()->route('bookings.show', $booking)->with('success', 'Бронирование создано.');
     }
 
     public function show(Booking $booking): View
     {
         Gate::authorize('view', $booking);
-        $booking->load(['computer', 'user']);
 
-        return view('bookings.show', compact('booking'));
+        return view('bookings.show', ['booking' => $booking->load(['computer', 'user'])]);
     }
 
     public function edit(Booking $booking): View
@@ -63,36 +57,52 @@ class BookingController extends Controller
         Gate::authorize('update', $booking);
 
         return view('bookings.edit', [
-            'booking' => $booking->load(['computer', 'user']),
+            'booking' => $booking->load('computer'),
             'computers' => Computer::query()->where('is_active', true)->orderBy('name')->get(),
             'selectedComputerId' => $booking->computer_id,
         ]);
     }
 
-    public function update(BookingRequest $request, Booking $booking, BookingService $service): RedirectResponse
+    public function update(BookingRequest $request, Booking $booking): RedirectResponse
     {
-        $service->save(
-            $booking,
-            $request->integer('computer_id'),
-            $request->validated('starts_at'),
-            $request->validated('ends_at'),
-        );
+        $this->saveBooking($request, $booking);
 
-        return redirect()->route('bookings.show', $booking)->with('success', 'Бронирование изменено. Выбранное время забронировано.');
+        return redirect()->route('bookings.show', $booking)->with('success', 'Бронирование изменено.');
     }
 
     public function destroy(Booking $booking): RedirectResponse
     {
-        DB::transaction(function () use ($booking): void {
-            $booking->refresh();
-            Gate::authorize('delete', $booking);
-            $booking->delete();
-        });
+        Gate::authorize('delete', $booking);
+        $booking->delete();
 
-        $message = $booking->starts_at->isFuture()
-            ? 'Бронирование отменено. Время снова доступно.'
-            : 'Запись о бронировании удалена.';
+        return redirect()->route('bookings.index')->with('success', 'Бронирование удалено.');
+    }
 
-        return redirect()->route('bookings.index')->with('success', $message);
+    private function saveBooking(BookingRequest $request, Booking $booking): void
+    {
+        $booking->fill([
+            'computer_id' => $request->integer('computer_id'),
+            'starts_at' => CarbonImmutable::parse($request->validated('starts_at'), config('app.club_timezone'))->utc(),
+            'ends_at' => CarbonImmutable::parse($request->validated('ends_at'), config('app.club_timezone'))->utc(),
+        ]);
+
+        if (! $booking->starts_at->isFuture()) {
+            throw ValidationException::withMessages(['starts_at' => 'Начало брони должно быть в будущем.']);
+        }
+
+        $conflictingBookings = Booking::query()
+            ->where('computer_id', $booking->computer_id)
+            ->where('starts_at', '<', $booking->ends_at)
+            ->where('ends_at', '>', $booking->starts_at);
+
+        if ($booking->exists) {
+            $conflictingBookings->whereKeyNot($booking->id);
+        }
+
+        if ($conflictingBookings->exists()) {
+            throw ValidationException::withMessages(['starts_at' => 'Компьютер уже забронирован на часть этого периода.']);
+        }
+
+        $booking->save();
     }
 }

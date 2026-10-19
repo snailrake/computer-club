@@ -7,7 +7,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ComputerRequest;
 use App\Models\Computer;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -16,7 +15,7 @@ class ComputerController extends Controller
 {
     public function index(): View
     {
-        return view('computers.index', ['computers' => Computer::query()->orderBy('name')->paginate(9)]);
+        return view('computers.index', ['computers' => Computer::query()->orderBy('name')->paginate(10)]);
     }
 
     public function create(): View
@@ -35,9 +34,7 @@ class ComputerController extends Controller
 
     public function show(Computer $computer): View
     {
-        $upcomingBookings = $computer->bookings()->where('ends_at', '>', now())->orderBy('starts_at')->limit(8)->get();
-
-        return view('computers.show', compact('computer', 'upcomingBookings'));
+        return view('computers.show', compact('computer'));
     }
 
     public function edit(Computer $computer): View
@@ -58,15 +55,13 @@ class ComputerController extends Controller
     {
         Gate::authorize('delete', $computer);
 
-        DB::transaction(function () use ($computer): void {
-            if ($computer->bookings()->exists()) {
-                throw ValidationException::withMessages([
-                    'computer' => 'У компьютера есть бронирования. Сначала удалите их или отключите приём новых броней.',
-                ]);
-            }
+        if ($computer->bookings()->exists()) {
+            throw ValidationException::withMessages([
+                'computer' => 'У компьютера есть бронирования. Сначала удалите их или отключите приём новых броней.',
+            ]);
+        }
 
-            $computer->delete();
-        });
+        $computer->delete();
 
         return redirect()->route('computers.index')->with('success', 'Компьютер удалён.');
     }
